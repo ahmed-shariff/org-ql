@@ -1077,20 +1077,41 @@ representation `org-ql-view-buffers-files' is returned."
       (org-ql-view--expand-buffers-files completion-read-result))))
 
 (defun org-ql-view--expand-buffers-files (buffers-files)
-  "Return BUFFERS-FILES expanded to a list of files or buffers.
-The counterpart to `org-ql-view--contract-buffers-files'."
-  (--> (-list buffers-files)
-    (pcase-exhaustive it
-      ("all" (--select (equal (buffer-local-value 'major-mode it) 'org-mode)
-                       (buffer-list)))
-      ("org-agenda-files" (org-agenda-files))
-      ("org-directory" (org-ql-search-directories-files))
-      ((or "" "buffer") (current-buffer))
-      ((pred bufferp) (list it))
-      ((pred listp) (list it))
-      ;; A single filename.
-      ((pred stringp) (list it)))
-    -non-nil -uniq -flatten))
+  (cl-labels
+      ((process-buffers-files-elements
+        (_buffers-files)
+        (pcase-exhaustive _buffers-files
+          ("all" (--select (equal (buffer-local-value 'major-mode it) 'org-mode)
+                           (buffer-list)))
+          ("org-agenda-files" (org-agenda-files))
+          ("org-directory" (org-ql-search-directories-files))
+          ((or "" "buffer") (current-buffer))
+          ((pred bufferp) (list _buffers-files))
+          ((pred listp) (list _buffers-files))
+          ;; A single filename.
+          ((pred stringp) (list _buffers-files)))))
+    (-uniq (-mapcat #'process-buffers-files-elements
+                    (remove nil (if (listp buffers-files)
+                                    buffers-files
+                                  (list buffers-files))))
+           :test 'equalp)))
+
+
+;; (defun org-ql-view--expand-buffers-files (buffers-files)
+;;   "Return BUFFERS-FILES expanded to a list of files or buffers.
+;; The counterpart to `org-ql-view--contract-buffers-files'."
+;;   (--> (-list buffers-files)
+;;     (pcase-exhaustive it
+;;       ("all" (--select (equal (buffer-local-value 'major-mode it) 'org-mode)
+;;                        (buffer-list)))
+;;       ("org-agenda-files" (org-agenda-files))
+;;       ("org-directory" (org-ql-search-directories-files))
+;;       ((or "" "buffer") (current-buffer))
+;;       ((pred bufferp) (list it))
+;;       ((pred listp) (list it))
+;;       ;; A single filename.
+;;       ((pred stringp) (list it)))
+;;     -non-nil -uniq -flatten))
        
 (defun org-ql-view--complete-super-groups ()
   "Return value for `org-ql-view-super-groups' using completion."

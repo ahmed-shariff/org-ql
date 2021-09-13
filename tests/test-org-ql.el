@@ -2068,7 +2068,7 @@ with keyword arg NOW in PLIST."
           (it "Can search a file by filename"
             (expect (var-after-link-save-open 'org-ql-view-buffers-files one-filename query
                                               :store-input "M-n M-n RET")
-                    :to-equal one-filename))
+                    :to-equal (list one-filename)))
           (it "Can search multiple files by filename"
             (expect (var-after-link-save-open 'org-ql-view-buffers-files temp-filenames query
                                               :store-input "M-n M-n RET")
@@ -2114,13 +2114,15 @@ with keyword arg NOW in PLIST."
                     :to-throw 'user-error '("Views that search non-file-backed buffers can’t be linked to"))))
         (describe "Completion for Files/buffers"
           (describe "Contracting org-ql-view-buffers-files"
+            :var ((org-directory temp-dir))
             (it "org-agenda-files from list"
               (spy-on 'org-agenda-files :and-return-value temp-filenames)
               (expect (org-ql-view--contract-buffers-files temp-filenames) :to-equal "org-agenda-files"))
             (it "org-directory"
-              (spy-on 'org-ql-search-directories-files :and-return-value temp-filenames)
               (spy-on 'org-agenda-files :and-return-value '())
-              (expect (org-ql-view--contract-buffers-files temp-filenames) :to-equal temp-filenames))
+              ;; Also indirectly tests org-ql-search-directories-files
+              (let ((out (format "- %s " org-directory)));; (org-ql-search-directories-files :directories (list org-directory)))))
+                (expect (org-ql-view--contract-buffers-files temp-filenames) :to-equal out)));;"org-directory")))
             (it "buffer"
               (with-current-buffer (org-ql-test-data-buffer "data.org")
                 (expect (org-ql-view--contract-buffers-files (current-buffer)) :to-equal "buffer")))
@@ -2134,27 +2136,25 @@ with keyword arg NOW in PLIST."
                 (expect (org-ql-view--contract-buffers-files value1) :to-equal value1)
                 (expect (org-ql-view--contract-buffers-files value2) :to-equal value2))))
           (describe "Expanding org-ql-view-buffers-files"
-            (it "all"
-              (let* ((buffer-names (list (make-temp-file "test" nil ".org") (make-temp-file "test" nil ".other")))
-                     (buffers (mapcar #'get-buffer-create buffer-names)))
-                (save-excursion
-                  (switch-to-buffer (car buffers))
+            (it "returns all buffers with `org-mode' as the major-mode"
+              (let ((buffers (list (generate-new-buffer "test.org") (generate-new-buffer "test.other"))))
+                (with-current-buffer (car buffers)
                   (org-mode))
                 (spy-on 'buffer-list :and-return-value buffers)
                 (expect (org-ql-view--expand-buffers-files "all") :to-equal (list (car buffers)))))
-            (it "org-agenda-files"
-              (spy-on 'org-agenda-files :and-return-value "value for org-agenda-files")
-              (expect (org-ql-view--expand-buffers-files "org-agenda-files") :to-equal "value for org-agenda-files"))
-            (it "org-directory"
-              (spy-on 'org-ql-search-directories-files :and-return-value "value for org-directory")
-              (expect (org-ql-view--expand-buffers-files "org-directory") :to-equal "value for org-directory"))
-            (it "buffer"
+            (it "returns values of \"org-agenda-files\""
+              (let ((org-agenda-files (list (generate-new-buffer-name "test1") (generate-new-buffer-name "test1"))))
+                (expect (org-ql-view--expand-buffers-files "org-agenda-files") :to-equal org-agenda-files)))
+            (it "returns values of \"org-directory\""
+              ;; Also indirectly tests `org-ql-view--expand-buffers-files'
+              (expect (org-ql-view--expand-buffers-files "org-directory") :to-equal temp-filenames))
+            (it "returns the current buffer"
               (with-temp-buffer
                 (expect (org-ql-view--expand-buffers-files "buffer") :to-equal (current-buffer))))
-            (it "literal values"
+            (it "returns literal value(s)"
               (with-temp-buffer
                 (expect (org-ql-view--expand-buffers-files (current-buffer)) :to-equal (current-buffer)))
-              (let ((test-buffer (get-buffer-create (make-temp-file "test"))))
+              (let ((test-buffer (generate-new-buffer "test")))
                 (expect (org-ql-view--expand-buffers-files test-buffer) :to-equal test-buffer))
               (let ((test-list '(1 2 3)))
                 (expect (org-ql-view--expand-buffers-files test-list) :to-equal test-list))
@@ -2184,7 +2184,7 @@ with keyword arg NOW in PLIST."
                 (expect (org-ql-view--complete-buffers-files) :to-equal org-ql-view-buffers-files)
                 (expect 'completing-read :not :to-have-been-called)))
             (it "buffer"
-              (let ((org-ql-view-buffers-files (get-buffer-create (make-temp-file "test"))))
+              (let ((org-ql-view-buffers-files (generate-new-buffer "test")))
                 (spy-on 'completing-read :and-return-value nil)
                 (expect (org-ql-view--complete-buffers-files) :to-equal org-ql-view-buffers-files)
                 (expect 'completing-read :not :to-have-been-called)))))))
