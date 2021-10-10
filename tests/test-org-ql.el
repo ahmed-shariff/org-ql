@@ -507,6 +507,53 @@ with keyword arg NOW in PLIST."
     ;;                            :to ,(make-ts :unix 1546408799.0))))
     )
 
+  (describe "Value of buffers-or-files passed to org-ql-select"
+    :var* ((query '(and (level 1) (todo)))
+           (temp-buffer-names '("*temp1*" "*temp2"))
+           (temp-buffers (--map 
+                          (with-current-buffer (get-buffer-create it)
+                            (org-mode)
+                            (insert "#+TITLE: Test data\n\n"
+                                    "* TODO Heading 1\n"
+                                    "Heading 1 text.\n\n"
+                                    "* Heading 2\n"
+                                    "Heading 2 text.\n"))
+                          temp-buffer-names)))
+    (after-all
+     (--map (kill-buffer it) temp-buffer-names))
+
+    (describe "is a single value"
+      (it "of a file name"
+        (org-ql-expect query '("Take over the universe" "Order a pizza" "Get haircut" "Internet" "Spaceship lease" "Fix flux capacitor")
+                       :buffer (org-ql-test-data-buffer "data.org"))
+      (it "of a buffer"
+        (org-ql-expect query '("Heading 1")
+                       :buffer (car temp-buffers)))
+      (it "of a buffer name"
+        (org-ql-expect query '("Heading 1")
+                       :buffer (car temp-buffer-names)))))
+    (describe "is a list"
+      (it "of file names"
+        (org-ql-expect query '("Take over the universe" "Order a pizza" "Get haircut" "Internet" "Spaceship lease" "Fix flux capacitor"
+                               "Take over the universe" "Order a pizza" "Get haircut" "Internet" "Spaceship lease" "Fix flux capacitor")
+                       :buffer (list (org-ql-test-data-buffer "data.org") (org-ql-test-data-buffer "data.org"))))
+      (it "of buffers"
+        (org-ql-expect query '("Heading 1" "Heading 1")
+                       :buffer temp-buffers))
+      (it "of buffer names"
+        (org-ql-expect query '("Heading 1" "Heading 1")
+                       :buffer temp-buffer-names))
+      (it "of buffer, buffer-name and file-name"
+        (org-ql-expect query '("Heading 1" "Heading 1" "Take over the universe" "Order a pizza" "Get haircut" "Internet" "Spaceship lease" "Fix flux capacitor")
+                       :buffer (list (car temp-buffers) (car temp-buffer-names) (org-ql-test-data-buffer "data.org")))))
+    (it "is a function"
+      (org-ql-expect query '("Heading 1" "Heading 1")
+                     :buffer (lambda () temp-buffers)))
+    (it "is null"
+      (with-current-buffer (car temp-buffer-names)
+        (org-ql-expect query '("Heading 1")
+                       :buffer nil))))
+
   (describe "Query preambles"
 
     ;; TODO: Other predicates.
